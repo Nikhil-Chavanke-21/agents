@@ -17,6 +17,7 @@
 		"@eslint/compat": "^2.0.2",
 		"@eslint/js": "^9.39.2",
 		"@sveltejs/adapter-static": "^3.0.10",
+		"@sveltejs/adapter-vercel": "^6.3.3",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@tailwindcss/vite": "^4.1.18",
@@ -44,7 +45,6 @@
 	"dependencies": {
 		"@distube/ytdl-core": "^4.16.12",
 		"@modelcontextprotocol/sdk": "^1.27.1",
-		"@sveltejs/adapter-node": "^5.5.4",
 		"openai": "^6.25.0",
 		"youtube-sr": "^4.3.12"
 	}
