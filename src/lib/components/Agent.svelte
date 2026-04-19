@@ -11,7 +11,8 @@
 
 	let agentState: AgentState = $state('sleeping');
 	let transcript = $state('');
-	let statusText = $state('Initializing...');
+	let statusText = $state('Click the orb to use voice');
+	let micOn = $state(false);
 	let recognition: SpeechRecognition | null = $state(null);
 	let sleepTimer: ReturnType<typeof setTimeout> | null = $state(null);
 
@@ -37,6 +38,7 @@
 	}
 
 	function deactivate() {
+		if (!micOn) return;
 		agentState = 'listening';
 		statusText = 'Say "Hey Siri / Mango / Buddy"';
 		transcript = '';
@@ -53,12 +55,40 @@
 		}, SLEEP_TIMEOUT);
 	}
 
+	function stopMic() {
+		micOn = false;
+		if (recognition) {
+			recognition.onend = null;
+			try {
+				recognition.abort();
+			} catch {
+				/* ignore */
+			}
+			recognition = null;
+		}
+		if (sleepTimer) clearTimeout(sleepTimer);
+		sleepTimer = null;
+		agentState = 'sleeping';
+		transcript = '';
+		statusText = 'Click the orb to use voice';
+	}
+
+	function toggleMic() {
+		if (micOn) {
+			stopMic();
+		} else {
+			startRecognition();
+		}
+	}
+
 	function startRecognition() {
 		const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 		if (!SpeechRecognitionCtor) {
-			statusText = 'Not supported';
+			statusText = 'Voice not supported in this browser';
 			return;
 		}
+
+		micOn = true;
 
 		const rec = new SpeechRecognitionCtor();
 		rec.continuous = true;
@@ -113,14 +143,20 @@
 
 		rec.onerror = (event: SpeechRecognitionErrorEvent) => {
 			console.warn('[Agent] Recognition error:', event.error);
-			if (event.error === 'not-allowed') statusText = 'Mic denied';
+			if (event.error === 'not-allowed') {
+				statusText = 'Mic denied';
+				stopMic();
+			}
 		};
 
 		rec.onend = () => {
+			if (!micOn) return;
 			try {
 				rec.start();
 			} catch {
-				setTimeout(() => rec.start(), 300);
+				setTimeout(() => {
+					if (micOn) rec.start();
+				}, 300);
 			}
 		};
 
@@ -129,11 +165,14 @@
 	}
 
 	$effect(() => {
-		startRecognition();
 		return () => {
 			if (recognition) {
 				recognition.onend = null;
-				recognition.abort();
+				try {
+					recognition.abort();
+				} catch {
+					/* ignore */
+				}
 			}
 			if (sleepTimer) clearTimeout(sleepTimer);
 		};
@@ -141,7 +180,14 @@
 </script>
 
 <div class="agent-widget">
-	<div class="orb-area">
+	<button
+		type="button"
+		class="orb-area"
+		class:orb-area-mic-on={micOn}
+		onclick={toggleMic}
+		aria-pressed={micOn}
+		aria-label={micOn ? 'Turn off voice input' : 'Turn on voice input'}
+	>
 		<div class="orb">
 			{#if agentState === 'active'}
 				{#each [0, 1, 2, 3] as ring (ring)}
@@ -152,7 +198,7 @@
 				<div class="orb-inner"></div>
 			</div>
 		</div>
-	</div>
+	</button>
 	<p class="status">{statusText}</p>
 </div>
 
@@ -174,6 +220,21 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		padding: 0;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		border-radius: 16px;
+		color: inherit;
+	}
+
+	.orb-area:focus-visible {
+		outline: 2px solid rgba(99, 102, 241, 0.6);
+		outline-offset: 4px;
+	}
+
+	.orb-area-mic-on {
+		box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.25);
 	}
 
 	.orb {
