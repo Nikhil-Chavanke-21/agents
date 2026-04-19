@@ -12,7 +12,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		});
 	}
 
-	const { message, bot = 'chat' } = body as { message?: string; bot?: Bot };
+	const {
+		message,
+		bot = 'chat',
+		systemPrompt = ''
+	} = body as { message?: string; bot?: Bot; systemPrompt?: string };
 	if (!message || typeof message !== 'string') {
 		const line = JSON.stringify({ type: 'error', message: 'message is required' } satisfies ChatEvent) + '\n';
 		return new Response(line, {
@@ -29,7 +33,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 			};
 
 			try {
-				await chat(message, emit, cookies, bot);
+				await chat(message, emit, cookies, bot, systemPrompt);
 			} catch (err) {
 				emit({ type: 'error', message: String(err) });
 				emit({ type: 'done', toolsUsed: false });

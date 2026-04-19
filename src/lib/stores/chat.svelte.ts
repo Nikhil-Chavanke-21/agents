@@ -101,10 +101,12 @@ export const chatStore = {
 
 		thinking = true;
 		try {
+			const systemPrompt =
+				typeof window !== 'undefined' ? localStorage.getItem('systemPrompt') || '' : '';
 			const res = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ message: cmd, bot })
+				body: JSON.stringify({ message: cmd, bot, systemPrompt })
 			});
 
 			const body = await res.text();

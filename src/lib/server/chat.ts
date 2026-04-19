@@ -1,32 +1,10 @@
 import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Cookies } from '@sveltejs/kit';
 import { callTool, getCachedTools, getSelectedAddressId, isConnected, listTools } from './swiggy';
 import { SPLITWISE_TOOL, createExpense } from './splitwise';
 
-const PROMPT_PATH = path.resolve('.system-prompt.txt');
-
-function loadPrompt(): string {
-	try {
-		return fs.readFileSync(PROMPT_PATH, 'utf-8');
-	} catch {
-		return '';
-	}
-}
-
-let systemPrompt = loadPrompt();
 let messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-
-export function getSystemPrompt() {
-	return systemPrompt;
-}
-
-export function setSystemPrompt(prompt: string) {
-	systemPrompt = prompt;
-	fs.writeFileSync(PROMPT_PATH, prompt, 'utf-8');
-}
 
 export function resetConversation() {
 	messages = [];
@@ -47,7 +25,7 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
 	return [...swiggyTools, SPLITWISE_TOOL];
 }
 
-function buildSystemContent(cookies: Cookies): string {
+function buildSystemContent(cookies: Cookies, systemPrompt: string): string {
 	let sys = systemPrompt;
 	const addressId = getSelectedAddressId(cookies);
 	if (addressId) {
@@ -128,7 +106,8 @@ export async function chat(
 	userMessage: string,
 	emit: (event: ChatEvent) => void,
 	cookies: Cookies,
-	bot: Bot = 'chat'
+	bot: Bot = 'chat',
+	systemPrompt = ''
 ): Promise<void> {
 	const apiKey = env.OPENAI_API_KEY;
 	if (!apiKey) {
@@ -160,7 +139,10 @@ export async function chat(
 	}
 
 	for (let i = 0; i < MAX_ITERATIONS; i++) {
-		const payload = [{ role: 'system' as const, content: buildSystemContent(cookies) }, ...messages];
+		const payload = [
+			{ role: 'system' as const, content: buildSystemContent(cookies, systemPrompt) },
+			...messages
+		];
 		const sizes = payload.map((m) => `${m.role}:${msgSize(m)}`);
 		const totalChars = payload.reduce((s, m) => s + msgSize(m), 0);
 		console.log(

@@ -5,23 +5,13 @@
 	let showPromptEditor = $state(false);
 	let systemPrompt = $state('');
 
-	async function openPromptEditor() {
-		try {
-			const res = await fetch('/api/chat/system-prompt');
-			const data = await res.json();
-			systemPrompt = data.prompt;
-		} catch {
-			/* keep whatever we have */
-		}
+	function openPromptEditor() {
+		systemPrompt = localStorage.getItem('systemPrompt') || '';
 		showPromptEditor = true;
 	}
 
-	async function savePrompt() {
-		await fetch('/api/chat/system-prompt', {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ prompt: systemPrompt })
-		});
+	function savePrompt() {
+		localStorage.setItem('systemPrompt', systemPrompt);
 		showPromptEditor = false;
 	}
 
