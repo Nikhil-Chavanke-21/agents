@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import { env } from '$env/dynamic/private';
 import fs from 'node:fs';
 import path from 'node:path';
-import { callTool, getCachedTools, getSelectedAddressId, isConnected } from './swiggy';
+import type { Cookies } from '@sveltejs/kit';
+import { callTool, getCachedTools, getSelectedAddressId, isConnected, listTools } from './swiggy';
 import { SPLITWISE_TOOL, createExpense } from './splitwise';
 
 const PROMPT_PATH = path.resolve('.system-prompt.txt');
@@ -46,9 +47,9 @@ function buildTools(): OpenAI.Chat.ChatCompletionTool[] {
 	return [...swiggyTools, SPLITWISE_TOOL];
 }
 
-function buildSystemContent(): string {
+function buildSystemContent(cookies: Cookies): string {
 	let sys = systemPrompt;
-	const addressId = getSelectedAddressId();
+	const addressId = getSelectedAddressId(cookies);
 	if (addressId) {
 		sys += `\n\nThe user's delivery address ID is: ${addressId}. Use this for any tool call requiring addressId or selectedAddressId.`;
 	}
@@ -126,6 +127,7 @@ const MAX_ITERATIONS = 15;
 export async function chat(
 	userMessage: string,
 	emit: (event: ChatEvent) => void,
+	cookies: Cookies,
 	bot: Bot = 'chat'
 ): Promise<void> {
 	const apiKey = env.OPENAI_API_KEY;
@@ -139,7 +141,14 @@ export async function chat(
 	sanitizeMessages();
 	messages.push({ role: 'user', content: userMessage });
 
-	const useTools = bot === 'cart' && isConnected();
+	const useTools = bot === 'cart' && isConnected(cookies);
+	if (useTools && getCachedTools().length === 0) {
+		try {
+			await listTools(cookies);
+		} catch (err) {
+			console.error('[Chat] listTools failed:', err);
+		}
+	}
 	const tools = useTools ? buildTools() : [];
 	console.log(`[Chat] bot=${bot} useTools=${useTools} for: "${userMessage}"`);
 	let toolsUsed = false;
@@ -151,7 +160,7 @@ export async function chat(
 	}
 
 	for (let i = 0; i < MAX_ITERATIONS; i++) {
-		const payload = [{ role: 'system' as const, content: buildSystemContent() }, ...messages];
+		const payload = [{ role: 'system' as const, content: buildSystemContent(cookies) }, ...messages];
 		const sizes = payload.map((m) => `${m.role}:${msgSize(m)}`);
 		const totalChars = payload.reduce((s, m) => s + msgSize(m), 0);
 		console.log(
@@ -195,7 +204,7 @@ export async function chat(
 					if (tc.function.name === 'splitwise_create_expense') {
 						result = await createExpense(args as Parameters<typeof createExpense>[0]);
 					} else {
-						result = await callTool(tc.function.name, args);
+						result = await callTool(cookies, tc.function.name, args);
 					}
 				} catch (err) {
 					result = { error: String(err) };

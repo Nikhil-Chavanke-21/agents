@@ -1,6 +1,7 @@
+import type { RequestHandler } from './$types';
 import { chat, resetConversation, type ChatEvent, type Bot } from '$lib/server/chat';
 
-export async function POST({ request }) {
+export const POST: RequestHandler = async ({ request, cookies }) => {
 	const body = await request.json();
 
 	if (body.reset) {
@@ -28,7 +29,7 @@ export async function POST({ request }) {
 			};
 
 			try {
-				await chat(message, emit, bot);
+				await chat(message, emit, cookies, bot);
 			} catch (err) {
 				emit({ type: 'error', message: String(err) });
 				emit({ type: 'done', toolsUsed: false });
@@ -45,4 +46,4 @@ export async function POST({ request }) {
 			'X-Accel-Buffering': 'no'
 		}
 	});
-}
+};
